@@ -1,0 +1,139 @@
+%% MUSIC (Multiple signal classification)
+
+clear all;
+close all;
+clc;
+
+%Come HOYW con L=N, problema quadrato, decompongo in autovalori/autovettori
+%e prendo i primi M come componenti il sottospazio di segnale e i restanti
+%(N-M) come componenti il sottospazio di rumore; la ricerca delle frequenze
+%viene effettuata per tentativi facendo il prodotto scalare tra un vettore
+%di prova che è una sinusoide campionata alla frequenza sotto esame e la
+%base del sottospazio in questione.
+% Se il prodotto scalare è fatto tra base del sottospazio di segnale e
+% vettore prova, se ne cerca il max, e la frequenza corrispondente al max è
+% scelta come stima --> massimizzare spettro di segnale
+
+% Se invece si sceglie di fare prodotto scalare tra base del sottospazio di
+% rumore e vettore prova, si deve selezionare come frequenza stimata quella
+% che annulla il prodotto --> massimizzazione dello spettro di rumore
+% calcolato come inverso della proiezione del vettore di prova sul
+% sottospazio di rumore
+
+%Ampiezza e fasi variano casualmente
+
+M=3; %sinusoidi complesse in gioco
+L=3*M; %cioè 9 in questo caso, ordine del predittore HOYW
+N=100; %numero di campioni dell'osservazione
+
+sign=2; %Potenza totale del rumore gaussiano circolare complesso
+Amp=5;
+SNR=20*log10(Amp/sign);
+gamma_inv=eye(L)*(1/sign); %matrice di covarianza di rumore 
+
+
+s=raylrnd(repmat(Amp,M,1)).*exp(1i*(2*pi)*rand(M,1)); %vettore ampiezze complesse
+%delle sinusoidi
+
+%chiaramente devo definire pulsazioni normalizzate comprese tra -pi e pi
+w1=pi/2;
+w2=pi/4;
+w3=pi*(2/3);
+
+%matrice A(w)
+
+A=[exp(-1i*w1*[0:N-1]') exp(-1i*w2*[0:N-1]') exp(-1i*w3*[0:N-1]')];
+
+%osservazioni
+
+x=(A*s)'+ (sqrt(sign/2))*(randn(1,N)+1i*randn(1,N)); %modello osservazioni con rumore
+
+%Stima della matrice di autocorrelazione campionaria
+
+Rx_s=xcorr(x,'biased'); %1 modo
+%Rx_s_trunc=(1/N)*cconv(x,conj(fliplr(x))); %2 modo
+
+N_aut=length(Rx_s); %dispari
+
+rx_semi=Rx_s((N_aut-1)/2+1:end); %solo parte da 0 a N
+
+%figure,subplot(1,2,1),plot(abs(Rx_s((N_aut-1)/2+1:end)),'b'),...
+%    title(strcat('Stima autocorrelazione campionaria da lag 1 a ',num2str(N)))
+    %subplot(1,2,2),plot(abs(Rx_s_trunc),'r')
+    
+%Devo scegliere ordine del filtro L, dato che il predittore è lungo M
+
+
+%costruisco la matrice di autocorrelazione
+for i=1:L
+    RX(i,:)=rx_semi(L+(i-1):-1:i); %riempio una riga della matrice
+    rx_v(i)=rx_semi(L+i); %riempio un pezzo del vettore
+end
+
+%Dato ce N=L, la matrice di correlazione è quadrata, posso decomporla in
+%autovalori e autovettori e direttamente da questi trovare basi per
+%sottospazio di segnale e rumore
+
+[V,D]=eig(RX); %scelgo i primi M come appartenenti al sottospazio di segnale
+
+Vs=V(:,1:M); %sottospazio di segnale
+Vn=V(:,M+1:end); %sottospazio di rumore
+
+%Costruzione dello spettro di segnale
+w=-pi:pi/500:pi;
+
+for i=1:length(w)
+    a=exp(1i*w(i)*[0:L-1]'); %Lx1
+    sign_spectr(i)=a'*Vs*Vs'*a;
+end
+
+%Costruzione dello spettro di rumore
+for i=1:length(w)
+    a=exp(1i*w(i)*[0:L-1]'); %Lx1
+    rum_spectr(i)=1/(a'*Vn*Vn'*a);
+end
+
+
+figure,subplot(1,2,1),plot(w,sign_spectr,'r'),title(strcat('Spettro di segnale MUSIC con SNR pari a',num2str(SNR),'dB')),...
+    xlabel('Pulsazioni normalizzate'),ylabel('Ampiezza spettro segnale'),...
+    axis([-pi pi 0 max(sign_spectr)+2]),...
+    subplot(1,2,2),plot(w,rum_spectr,'b'),title(strcat('Spettro di rumore MUSIC con SNR pari a',num2str(SNR),'dB')),...
+    xlabel('Pulsazioni normalizzate'),ylabel('Ampiezza spettro rumore'),...
+    axis([-pi pi 0 max(rum_spectr)+2]),
+
+% Pisarenko - praticamente è un MUSIC con L=M+1, cioè ha un solo
+% autovettore come base del sottospazio di rumore, ed è dunque molto meno
+% efficiente del MUSIC
+
+L=M+1;
+clear RX;
+clear rx_v;
+%costruisco la matrice di autocorrelazione
+for i=1:L
+    RX(i,:)=rx_semi(L+(i-1):-1:i); %riempio una riga della matrice
+    rx_v(i)=rx_semi(L+i); %riempio un pezzo del vettore
+end
+
+%Dato ce N=L, la matrice di correlazione è quadrata, posso decomporla in
+%autovalori e autovettori e direttamente da questi trovare basi per
+%sottospazio di segnale e rumore
+
+[V,D]=eig(RX); %scelgo i primi M come appartenenti al sottospazio di segnale
+
+Vs=V(:,1:M); %sottospazio di segnale
+Vn=V(:,M+1:end); %sottospazio di rumore
+
+%Costruzione dello spettro di rumore
+for i=1:length(w)
+    a=exp(1i*w(i)*[0:L-1]'); %Lx1
+    spectr_pisa(i)=1/(a'*Vn*Vn'*a);
+end
+
+figure,plot(w,spectr_pisa,'g'),title(strcat('Spettro di rumore Pisarenko con SNR pari a',num2str(SNR),'dB')),...
+    xlabel('Pulsazioni normalizzate'),ylabel('Ampiezza spettro rumore'),...
+    axis([-pi pi 0 max(spectr_pisa)+2]),
+
+%si può dire che dato che il sottospazio di rumore occupa 1 sola
+%dimensione, è facile pernsare che per alcune realizzazioni di rumore il
+%sottospazio di segnale possa non essere composto da una base
+%corrispondente alle sinusoidi campionate alle frequenze desiderate, 

@@ -1,0 +1,86 @@
+%% Implementazione numerica dei poli con equazioni alle differenze
+close all;
+clear all;
+clc;
+
+
+e=1e-6;
+
+apro=wavread('prova.wav');
+
+
+
+%Sfasatore puro
+
+Bp=[(1-e)*exp(-1i*(pi/4)) (1-e)*exp(1i*(pi/4))]; %sequenza di poli - tutti a fase minima
+Az=conj(1./Bp); %sequenza di zeri - di conseguenza a fase max
+
+
+[x]=zero(Az);
+% 
+% aud_fil=conv(apro,x);
+% 
+
+
+%effetto su sinusoide campionata
+
+t=0:(1/fc):0.5;
+
+f1=fN/4;
+si=sin(2*pi*f1*t);
+
+si_fil=conv(si,x);
+
+%figure,plot(si_fil),title('Sinusoide a fN/4 filtrata con zero a +-fN/4')
+
+[y]=polo(si_fil,Bp(1));
+
+[y]=polo(y,Bp(2));
+
+figure,plot(imag(y),'b')
+
+%Potrei a questo punto valutare la fdt per frequenze continue, z=exp(j*2*pi*(f/fc))
+
+%Traccio la funzione di trasferimento corrispondente ad un filtro con
+%trasformata Z che ha questi zeri
+
+fc=2e3; %freq di campionamento delle sinusoidi complesse campionate usate per il calcolo 
+%della FDT
+fN=fc/2;
+
+M=2^11; %numero di frequenze generalizzate nelle quali valuto la FDT
+f=-(fc/2)+fc/M:fc/M:fc/2;
+for k=1:length(f)
+A=1;
+for i=1:length(Az)
+    A=A*(1-Az(i)*exp(-1i*2*pi*(f(k)/fc)));
+end
+
+Num(k)=A;
+
+B=1;
+for i=1:length(Bp)
+    B=B*(1-Bp(i)*exp(-1i*2*pi*(f(k)/fc)));
+end
+
+Den(k)=B;
+
+clear A;
+clear B;
+end
+
+Spettro=Num./Den;
+
+figure,subplot(1,2,1),plot(f,10*log10(abs(Spettro))),title('Modulo della FDT fino a fN'),...
+    xlabel('f [Hz]'),ylabel('Ampiezza [dB]'),axis([-fN fN min(10*log10(abs(Spettro)))-1 max(10*log10(abs(Spettro)))+1]),...
+    subplot(1,2,2),plot(f,angle(Spettro)),title('Fase della FDT fino a fN'),...
+    xlabel('f [Hz]'),ylabel('Fase [rad]'),axis([-fN fN -pi pi]),...
+
+%convoluzione zero-polo
+
+% g=conv(y,x);
+% 
+% figure,stem(y)
+% figure,stem(x)
+% figure,stem(g)
+

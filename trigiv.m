@@ -1,0 +1,34 @@
+%% Triangolarizzazione di una matrice via rotazioni di Givens
+
+function [A_tri,Qtot1]=trigiv(A)
+
+N=size(A,1);
+M=size(A,2);
+A_tri=A;
+
+%rango (a meno di colonne o righe linearmente dipendenti)
+rang=min(N,M);
+k=1;
+for j=1:1:(rang-1)
+    for i=rang:-1:(j+1)
+        Q=eye(rang);
+        the=atan(A_tri(i,j)/A_tri(j,j));
+        c=cos(the);
+        s=sin(the);
+        Q(j,j)=c;
+        Q(i,j)=-s;
+        Q(j,i)=s;
+        Q(i,i)=c;
+        Qt(:,:,k)=Q;
+        A_tri=Q*A_tri;
+        k=k+1;
+    end
+end
+
+Qtot1=eye(rang);
+
+for k=size(Qt,3):-1:1
+    Qtot1=Qtot1*Qt(:,:,k);
+end
+
+
